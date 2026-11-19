@@ -210,11 +210,14 @@ export function MenuCatalog() {
       )}
 
       {/* Modal Kustomisasi Sambal & Add-ons */}
-      <MenuItemModal
-        item={activeItemForModal}
-        onClose={() => setActiveItemForModal(null)}
-        onAddToCart={addItem}
-      />
+      {activeItemForModal && (
+        <MenuItemModal
+          key={activeItemForModal.id}
+          item={activeItemForModal}
+          onClose={() => setActiveItemForModal(null)}
+          onAddToCart={addItem}
+        />
+      )}
 
       {/* Drawer Form Checkout */}
       <CartDrawer

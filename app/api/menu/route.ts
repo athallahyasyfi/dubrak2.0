@@ -89,29 +89,27 @@ export async function POST(request: Request) {
     };
 
     if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-      try {
-        const supabase = createAdminClient();
-        const { data: dbItem, error } = await supabase
-          .from('menus')
-          .insert({
-            name: newItem.name,
-            category: newItem.category_id,
-            description: newItem.description,
-            price: newItem.base_price,
-            image_url: newItem.image_url,
-            is_available: true,
-            modifier_groups: newItem.modifier_groups,
-          })
-          .select()
-          .single();
+      const supabase = createAdminClient();
+      const { data: dbItem, error } = await supabase
+        .from('menus')
+        .insert({
+          name: newItem.name,
+          category: newItem.category_id,
+          description: newItem.description,
+          price: newItem.base_price,
+          image_url: newItem.image_url,
+          is_available: true,
+          modifier_groups: newItem.modifier_groups,
+        })
+        .select()
+        .single();
 
-        if (!error && dbItem) {
-          addLocalMenuItem({ ...newItem, id: dbItem.id });
-          return NextResponse.json({ item: { ...newItem, id: dbItem.id } }, { status: 201 });
-        }
-      } catch (err) {
-        console.warn('Supabase insert failed:', err);
+      if (error) {
+        return NextResponse.json({ error: `Gagal menyimpan menu ke Supabase: ${error.message}` }, { status: 500 });
       }
+
+      addLocalMenuItem({ ...newItem, id: dbItem.id });
+      return NextResponse.json({ item: { ...newItem, id: dbItem.id } }, { status: 201 });
     }
 
     addLocalMenuItem(newItem);
@@ -135,19 +133,19 @@ export async function PUT(request: Request) {
       reorderLocalMenuItems(orderedIds);
       // shortcut: reuses menus.created_at to store sort order without a schema migration, upgrade to dedicated sort_order column if item creation timestamp is needed
       if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-        try {
-          const supabase = createAdminClient();
-          const baseTime = Date.now();
-          await Promise.all(
-            orderedIds.map((itemId, idx) =>
-              supabase
-                .from('menus')
-                .update({ created_at: new Date(baseTime - idx * 1000).toISOString() })
-                .eq('id', itemId)
-            )
-          );
-        } catch (err) {
-          console.warn('Supabase reorder failed:', err);
+        const supabase = createAdminClient();
+        const baseTime = Date.now();
+        const results = await Promise.all(
+          orderedIds.map((itemId, idx) =>
+            supabase
+              .from('menus')
+              .update({ created_at: new Date(baseTime - idx * 1000).toISOString() })
+              .eq('id', itemId)
+          )
+        );
+        const firstErr = results.find((r) => r.error)?.error;
+        if (firstErr) {
+          return NextResponse.json({ error: `Gagal menyimpan urutan ke Supabase: ${firstErr.message}` }, { status: 500 });
         }
       }
       return NextResponse.json({ success: true });
@@ -170,25 +168,24 @@ export async function PUT(request: Request) {
 
     let supaUpdated = false;
     if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-      try {
-        const supabase = createAdminClient();
-        const supaPayload: any = {};
-        if (updatePayload.name !== undefined) supaPayload.name = updatePayload.name;
-        if (updatePayload.category_id !== undefined) supaPayload.category = updatePayload.category_id;
-        if (updatePayload.description !== undefined) supaPayload.description = updatePayload.description;
-        if (updatePayload.base_price !== undefined) supaPayload.price = updatePayload.base_price;
-        if (updatePayload.image_url !== undefined) supaPayload.image_url = updatePayload.image_url;
-        if (updatePayload.is_available !== undefined) supaPayload.is_available = updatePayload.is_available;
-        if (updatePayload.modifier_groups !== undefined) supaPayload.modifier_groups = updatePayload.modifier_groups;
+      const supabase = createAdminClient();
+      const supaPayload: any = {};
+      if (updatePayload.name !== undefined) supaPayload.name = updatePayload.name;
+      if (updatePayload.category_id !== undefined) supaPayload.category = updatePayload.category_id;
+      if (updatePayload.description !== undefined) supaPayload.description = updatePayload.description;
+      if (updatePayload.base_price !== undefined) supaPayload.price = updatePayload.base_price;
+      if (updatePayload.image_url !== undefined) supaPayload.image_url = updatePayload.image_url;
+      if (updatePayload.is_available !== undefined) supaPayload.is_available = updatePayload.is_available;
+      if (updatePayload.modifier_groups !== undefined) supaPayload.modifier_groups = updatePayload.modifier_groups;
 
-        const { error } = await supabase
-          .from('menus')
-          .update(supaPayload)
-          .eq('id', id);
-        supaUpdated = !error;
-      } catch (err) {
-        console.warn('Supabase update failed:', err);
+      const { error } = await supabase
+        .from('menus')
+        .update(supaPayload)
+        .eq('id', id);
+      if (error) {
+        return NextResponse.json({ error: `Gagal mengupdate menu di Supabase: ${error.message}` }, { status: 500 });
       }
+      supaUpdated = true;
     }
 
     const updated = updateLocalMenuItem(id, updatePayload);
@@ -216,17 +213,18 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'ID menu diperlukan' }, { status: 400 });
     }
 
+    let supaDeleted = false;
     if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-      try {
-        const supabase = createAdminClient();
-        await supabase.from('menus').delete().eq('id', id);
-      } catch (err) {
-        console.warn('Supabase delete failed:', err);
+      const supabase = createAdminClient();
+      const { error } = await supabase.from('menus').delete().eq('id', id);
+      if (error) {
+        return NextResponse.json({ error: `Gagal menghapus menu di Supabase: ${error.message}` }, { status: 500 });
       }
+      supaDeleted = true;
     }
 
     const deleted = deleteLocalMenuItem(id);
-    return NextResponse.json({ success: deleted });
+    return NextResponse.json({ success: supaDeleted || deleted });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Gagal menghapus menu' }, { status: 500 });
   }

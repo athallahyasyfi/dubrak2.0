@@ -5,7 +5,7 @@ import { MenuItem, SelectedModifier } from '@/types';
 import { X, Plus, Minus, Check } from 'lucide-react';
 
 interface MenuItemModalProps {
-  item: MenuItem | null;
+  item: MenuItem;
   onClose: () => void;
   onAddToCart: (data: {
     menuItemId: string;
@@ -18,8 +18,6 @@ interface MenuItemModalProps {
 }
 
 export function MenuItemModal({ item, onClose, onAddToCart }: MenuItemModalProps) {
-  if (!item) return null;
-
   const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState('');
 

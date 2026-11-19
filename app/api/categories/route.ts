@@ -46,17 +46,16 @@ export async function POST(request: Request) {
     const newCategory = addLocalCategory(name.trim(), sort_order);
 
     if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-      try {
-        const supabase = createAdminClient();
-        await supabase
-          .from('categories')
-          .insert({
-            id: newCategory.id,
-            name: newCategory.name,
-            sort_order: newCategory.sort_order,
-          });
-      } catch (err) {
-        console.warn('Supabase category insert failed:', err);
+      const supabase = createAdminClient();
+      const { error } = await supabase
+        .from('categories')
+        .insert({
+          id: newCategory.id,
+          name: newCategory.name,
+          sort_order: newCategory.sort_order,
+        });
+      if (error) {
+        return NextResponse.json({ error: `Gagal menyimpan kategori ke Supabase: ${error.message}` }, { status: 500 });
       }
     }
 
@@ -82,19 +81,18 @@ export async function PUT(request: Request) {
 
     let supaUpdated = false;
     if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-      try {
-        const supabase = createAdminClient();
-        const { error } = await supabase
-          .from('categories')
-          .update({
-            name: name.trim(),
-            ...(sort_order !== undefined ? { sort_order } : {}),
-          })
-          .eq('id', id);
-        supaUpdated = !error;
-      } catch (err) {
-        console.warn('Supabase category update failed:', err);
+      const supabase = createAdminClient();
+      const { error } = await supabase
+        .from('categories')
+        .update({
+          name: name.trim(),
+          ...(sort_order !== undefined ? { sort_order } : {}),
+        })
+        .eq('id', id);
+      if (error) {
+        return NextResponse.json({ error: `Gagal mengubah kategori di Supabase: ${error.message}` }, { status: 500 });
       }
+      supaUpdated = true;
     }
 
     const updated = updateLocalCategory(id, name.trim(), sort_order);
@@ -122,17 +120,18 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'ID kategori diperlukan' }, { status: 400 });
     }
 
+    let supaDeleted = false;
     if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-      try {
-        const supabase = createAdminClient();
-        await supabase.from('categories').delete().eq('id', id);
-      } catch (err) {
-        console.warn('Supabase category delete failed:', err);
+      const supabase = createAdminClient();
+      const { error } = await supabase.from('categories').delete().eq('id', id);
+      if (error) {
+        return NextResponse.json({ error: `Gagal menghapus kategori di Supabase: ${error.message}` }, { status: 500 });
       }
+      supaDeleted = true;
     }
 
     const deleted = deleteLocalCategory(id);
-    return NextResponse.json({ success: deleted });
+    return NextResponse.json({ success: supaDeleted || deleted });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Gagal menghapus kategori' }, { status: 500 });
   }

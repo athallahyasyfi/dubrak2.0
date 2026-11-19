@@ -38,9 +38,26 @@ const createOrderSchema = z.object({
   items: z.array(orderItemSchema).min(1, 'Pesanan minimal memiliki 1 menu'),
 });
 
+const updateOrderSchema = z.object({
+  id: z.string().min(1, 'ID pesanan wajib diisi'),
+  status: z.enum(['MENUNGGU_BAYAR', 'DIPROSES', 'SIAP_DIAMBIL', 'SELESAI', 'BATAL']),
+  payment_method: z.enum(['CASH', 'QRIS']).optional(),
+});
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
+
+  if (!id) {
+    const session = await getServerSession();
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Akses ditolak. Silakan login terlebih dahulu.' },
+        { status: 401 }
+      );
+    }
+  }
+
   const date = searchParams.get('date');
   const isDay = Boolean(date && /^\d{4}-\d{2}-\d{2}$/.test(date));
   const isMonth = Boolean(date && /^\d{4}-\d{2}$/.test(date));
@@ -179,16 +196,10 @@ export async function POST(request: Request) {
       if (item.modifiers && item.modifiers.length > 0) {
         for (const mod of item.modifiers) {
           const modQty = mod.quantity || 1;
-          let foundOpt = undefined;
-          if (originalMenu.modifier_groups) {
-            for (const grp of originalMenu.modifier_groups) {
-              const opt = grp.options.find((o) => o.name === mod.option_name);
-              if (opt) {
-                foundOpt = opt;
-                break;
-              }
-            }
-          }
+          const matchedGroup = originalMenu.modifier_groups?.find((g) => g.title === mod.group_title);
+          const foundOpt = matchedGroup
+            ? matchedGroup.options.find((o) => o.name === mod.option_name)
+            : originalMenu.modifier_groups?.flatMap((g) => g.options).find((o) => o.name === mod.option_name);
           if (!foundOpt) {
             return NextResponse.json(
               { error: `Opsi "${mod.option_name}" pada menu "${originalMenu.name}" tidak ditemukan.` },
@@ -211,6 +222,23 @@ export async function POST(request: Request) {
             price: verifiedPrice,
             quantity: modQty,
           });
+        }
+      }
+
+      if (originalMenu.modifier_groups) {
+        for (const grp of originalMenu.modifier_groups) {
+          const hasAvailableOptions = grp.options.some((o) => o.is_available !== false);
+          if (grp.is_required && hasAvailableOptions) {
+            const selectedInGroup = validModifiers.filter(
+              (vm) => vm.group_title === grp.title || grp.options.some((o) => o.name === vm.option_name)
+            );
+            if (selectedInGroup.length < Math.max(1, grp.min_selection || 1)) {
+              return NextResponse.json(
+                { error: `Pilihan "${grp.title}" pada menu "${originalMenu.name}" wajib dipilih.` },
+                { status: 400 }
+              );
+            }
+          }
         }
       }
 
@@ -254,33 +282,34 @@ export async function POST(request: Request) {
 
     // Jika Supabase terkoneksi, simpan ke Postgres
     if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-      try {
-        const supabase = createAdminClient();
-        const { data: dbOrder, error: orderErr } = await supabase
-          .from('orders')
-          .insert({
-            queue_code: newOrder.queue_code,
-            customer_name: newOrder.customer_name,
-            customer_phone: newOrder.customer_phone,
-            table_number: newOrder.table_number,
-            pickup_type: newOrder.pickup_type,
-            is_asap: newOrder.is_asap,
-            pickup_scheduled_time: newOrder.pickup_scheduled_time,
-            payment_method: newOrder.payment_method,
-            notes: newOrder.notes,
-            status: 'MENUNGGU_BAYAR',
-            total_amount: calculatedTotal,
-            items: validatedItems,
-          })
-          .select()
-          .single();
+      const supabase = createAdminClient();
+      const { data: dbOrder, error: orderErr } = await supabase
+        .from('orders')
+        .insert({
+          queue_code: newOrder.queue_code,
+          customer_name: newOrder.customer_name,
+          customer_phone: newOrder.customer_phone,
+          table_number: newOrder.table_number,
+          pickup_type: newOrder.pickup_type,
+          is_asap: newOrder.is_asap,
+          pickup_scheduled_time: newOrder.pickup_scheduled_time,
+          payment_method: newOrder.payment_method,
+          notes: newOrder.notes,
+          status: 'MENUNGGU_BAYAR',
+          total_amount: calculatedTotal,
+          items: validatedItems,
+        })
+        .select()
+        .single();
 
-        if (!orderErr && dbOrder) {
-          return NextResponse.json({ order: dbOrder }, { status: 201 });
-        }
-      } catch (err) {
-        console.warn('Supabase insert failed, continuing with local store:', err);
+      if (orderErr) {
+        return NextResponse.json(
+          { error: `Gagal menyimpan pesanan ke database: ${orderErr.message}` },
+          { status: 500 }
+        );
       }
+
+      return NextResponse.json({ order: dbOrder }, { status: 201 });
     }
 
     // Simpan ke local store
@@ -307,30 +336,29 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Akses ditolak. Silakan login sebagai kasir atau admin.' }, { status: 401 });
     }
 
-    const { id, status, payment_method } = await request.json();
-    if (!id || !status) {
-      return NextResponse.json({ error: 'Missing id or status' }, { status: 400 });
-    }
+    const { id, status, payment_method } = updateOrderSchema.parse(await request.json());
 
     // Jika Supabase
     if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-      try {
-        const supabase = createAdminClient();
-        const updatePayload: any = { status };
-        if (payment_method) {
-          updatePayload.payment_method = payment_method;
-          updatePayload.paid_at = new Date().toISOString();
-        }
-        const { data, error } = await supabase
-          .from('orders')
-          .update(updatePayload)
-          .eq('id', id)
-          .select('*')
-          .single();
-        if (!error && data) return NextResponse.json({ order: data });
-      } catch (e) {
-        console.warn('Supabase update failed:', e);
+      const supabase = createAdminClient();
+      const updatePayload: any = { status };
+      if (payment_method) {
+        updatePayload.payment_method = payment_method;
+        updatePayload.paid_at = new Date().toISOString();
       }
+      const { data, error } = await supabase
+        .from('orders')
+        .update(updatePayload)
+        .eq('id', id)
+        .select('*')
+        .single();
+      if (error) {
+        return NextResponse.json(
+          { error: `Gagal mengupdate pesanan di database: ${error.message}` },
+          { status: 500 }
+        );
+      }
+      return NextResponse.json({ order: data });
     }
 
     const updated = updateLocalOrderStatus(id, status, payment_method);
@@ -339,6 +367,12 @@ export async function PATCH(request: Request) {
     }
     return NextResponse.json({ order: updated });
   } catch (e: any) {
+    if (e instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: e.issues.map((i) => i.message).join(', ') },
+        { status: 400 }
+      );
+    }
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }
@@ -357,17 +391,21 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'ID transaksi pesanan diperlukan' }, { status: 400 });
     }
 
+    let supaDeleted = false;
     if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-      try {
-        const supabase = createAdminClient();
-        await supabase.from('orders').delete().eq('id', id);
-      } catch (err) {
-        console.warn('Supabase order delete failed:', err);
+      const supabase = createAdminClient();
+      const { error } = await supabase.from('orders').delete().eq('id', id);
+      if (error) {
+        return NextResponse.json(
+          { error: `Gagal menghapus pesanan di database: ${error.message}` },
+          { status: 500 }
+        );
       }
+      supaDeleted = true;
     }
 
     const deleted = deleteLocalOrder(id);
-    return NextResponse.json({ success: deleted });
+    return NextResponse.json({ success: supaDeleted || deleted });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Gagal menghapus pesanan' }, { status: 500 });
   }
