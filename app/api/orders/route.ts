@@ -42,7 +42,20 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
   const date = searchParams.get('date');
-  const isValidDate = Boolean(date && /^\d{4}-\d{2}-\d{2}$/.test(date));
+  const isDay = Boolean(date && /^\d{4}-\d{2}-\d{2}$/.test(date));
+  const isMonth = Boolean(date && /^\d{4}-\d{2}$/.test(date));
+
+  let startISO = '';
+  let endISO = '';
+  if (isDay && date) {
+    startISO = `${date}T00:00:00+07:00`;
+    endISO = `${date}T23:59:59.999+07:00`;
+  } else if (isMonth && date) {
+    const [y, m] = date.split('-').map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
+    startISO = `${date}-01T00:00:00+07:00`;
+    endISO = `${date}-${String(lastDay).padStart(2, '0')}T23:59:59.999+07:00`;
+  }
 
   // Coba ambil dari Supabase jika env terisi
   if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
@@ -61,10 +74,10 @@ export async function GET(request: Request) {
           .select('*')
           .order('created_at', { ascending: false });
 
-        if (isValidDate) {
+        if (startISO && endISO) {
           query = query
-            .gte('created_at', `${date}T00:00:00+07:00`)
-            .lte('created_at', `${date}T23:59:59.999+07:00`);
+            .gte('created_at', startISO)
+            .lte('created_at', endISO);
         } else {
           query = query.limit(500);
         }
@@ -85,9 +98,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ order: found });
   }
 
-  const filteredLocal = isValidDate
-    ? localOrders.filter(
-        (o) => new Date(o.created_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' }) === date
+  const filteredLocal = (isDay || isMonth) && date
+    ? localOrders.filter((o) =>
+        new Date(o.created_at)
+          .toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' })
+          .startsWith(date)
       )
     : localOrders;
 

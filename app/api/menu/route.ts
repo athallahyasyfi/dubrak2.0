@@ -5,6 +5,7 @@ import {
   addLocalMenuItem,
   updateLocalMenuItem,
   deleteLocalMenuItem,
+  reorderLocalMenuItems,
 } from '@/lib/store/menu-store';
 import { createAdminClient } from '@/lib/supabase/server';
 import { MenuItem } from '@/types';
@@ -128,6 +129,30 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
+
+    if (Array.isArray(body.orderedIds)) {
+      const orderedIds: string[] = body.orderedIds;
+      reorderLocalMenuItems(orderedIds);
+      // shortcut: reuses menus.created_at to store sort order without a schema migration, upgrade to dedicated sort_order column if item creation timestamp is needed
+      if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+        try {
+          const supabase = createAdminClient();
+          const baseTime = Date.now();
+          await Promise.all(
+            orderedIds.map((itemId, idx) =>
+              supabase
+                .from('menus')
+                .update({ created_at: new Date(baseTime - idx * 1000).toISOString() })
+                .eq('id', itemId)
+            )
+          );
+        } catch (err) {
+          console.warn('Supabase reorder failed:', err);
+        }
+      }
+      return NextResponse.json({ success: true });
+    }
+
     const { id, name, category_id, description, base_price, image_url, is_available, modifier_groups } = body;
 
     if (!id) {

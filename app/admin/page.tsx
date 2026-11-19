@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { MenuItem, Category, Order, ModifierGroup, ModifierOption } from '@/types';
-import { ArrowLeft, Plus, Edit2, Trash2, X, Check, Layers, Tag, Banknote, CreditCard, Upload } from 'lucide-react';
+import { ArrowLeft, Plus, Edit2, Trash2, X, Check, Layers, Tag, Banknote, CreditCard, Upload, ArrowUp, ArrowDown } from 'lucide-react';
 import Link from 'next/link';
 import { StaffAuthGate } from '@/components/auth/StaffAuthGate';
 
 const getTodayWIB = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
+const getThisMonthWIB = () => getTodayWIB().slice(0, 7);
 
 function AdminDashboardContent() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -243,37 +244,7 @@ function AdminDashboardContent() {
     setFormImageUrl('');
     setShowUrlInput(false);
     setShowInlineAddCategory(categories.length === 0);
-
-    const sambalGroupId = `grp-sambal-${Date.now()}`;
-    const addonGroupId = `grp-addon-${Date.now() + 1}`;
-    setFormModifierGroups([
-      {
-        id: sambalGroupId,
-        menu_item_id: '',
-        title: 'Pilihan Sambal',
-        is_required: true,
-        min_selection: 1,
-        max_selection: 1,
-        options: [
-          { id: `opt-s1-${Date.now()}`, group_id: sambalGroupId, name: 'Sambal Korek Bawang', price: 0, is_available: true },
-          { id: `opt-s2-${Date.now() + 1}`, group_id: sambalGroupId, name: 'Sambal Matah Bali', price: 0, is_available: true },
-          { id: `opt-s3-${Date.now() + 2}`, group_id: sambalGroupId, name: 'Sambal Ijo Gurih', price: 0, is_available: true },
-        ],
-      },
-      {
-        id: addonGroupId,
-        menu_item_id: '',
-        title: 'Extra Add-ons',
-        is_required: false,
-        min_selection: 0,
-        max_selection: 10,
-        options: [
-          { id: `opt-a1-${Date.now()}`, group_id: addonGroupId, name: 'Extra Keju Mozarella', price: 5000, is_available: true },
-          { id: `opt-a2-${Date.now() + 1}`, group_id: addonGroupId, name: 'Extra Kol Goreng', price: 3000, is_available: true },
-          { id: `opt-a3-${Date.now() + 2}`, group_id: addonGroupId, name: 'Extra Telur Dadar Crispy', price: 4000, is_available: true },
-        ],
-      },
-    ]);
+    setFormModifierGroups([]);
     setIsModalOpen(true);
   };
 
@@ -303,8 +274,8 @@ function AdminDashboardContent() {
         {
           id: `opt-${Date.now()}`,
           group_id: newGroupId,
-          name: type === 'sambal' ? 'Sambal Korek' : 'Extra Keju Mozarella',
-          price: type === 'sambal' ? 0 : 5000,
+          name: '',
+          price: 0,
           is_available: true,
         },
       ],
@@ -373,10 +344,12 @@ function AdminDashboardContent() {
       return;
     }
 
-    const cleanedGroups: ModifierGroup[] = formModifierGroups.map((g) => ({
-      ...g,
-      options: g.options.filter((opt) => opt.name && opt.name.trim() !== ''),
-    }));
+    const cleanedGroups: ModifierGroup[] = formModifierGroups
+      .map((g) => ({
+        ...g,
+        options: g.options.filter((opt) => opt.name && opt.name.trim() !== ''),
+      }))
+      .filter((g) => g.options.length > 0);
 
     setIsSubmitting(true);
     try {
@@ -468,6 +441,24 @@ function AdminDashboardContent() {
       }
     } catch (err) {
       console.warn(err);
+    }
+  };
+
+  const moveMenuItem = async (index: number, direction: -1 | 1) => {
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= menuItems.length) return;
+    const reordered = [...menuItems];
+    const [moved] = reordered.splice(index, 1);
+    reordered.splice(targetIndex, 0, moved);
+    setMenuItems(reordered);
+    try {
+      await fetch('/api/menu', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderedIds: reordered.map((m) => m.id) }),
+      });
+    } catch (err) {
+      console.warn('Gagal menyimpan urutan menu:', err);
     }
   };
 
@@ -578,7 +569,7 @@ function AdminDashboardContent() {
 
             {/* Grid Menu Items */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {menuItems.map((item) => (
+              {menuItems.map((item, idx) => (
                 <div
                   key={item.id}
                   className="bg-white rounded-lg p-4 border border-[#E6DCD5] flex flex-col justify-between"
@@ -596,9 +587,14 @@ function AdminDashboardContent() {
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        <span className="text-[11px] font-medium text-[#78716C] block">
-                          {categories.find((c) => c.id === item.category_id)?.name || 'Tanpa Kategori'}
-                        </span>
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-[11px] font-medium text-[#78716C] truncate">
+                            {categories.find((c) => c.id === item.category_id)?.name || 'Tanpa Kategori'}
+                          </span>
+                          <span className="text-[10px] font-mono font-semibold text-[#78716C] bg-[#FAF6F3] px-1.5 py-0.5 rounded border border-[#E6DCD5] shrink-0">
+                            #{idx + 1}
+                          </span>
+                        </div>
                         <h3 className="font-semibold text-sm text-[#1C1917] line-clamp-1">{item.name}</h3>
                         <span className="text-sm font-mono font-semibold text-[#D9381E] tabular-nums block mt-0.5">
                           Rp {item.base_price.toLocaleString('id-ID')}
@@ -656,7 +652,23 @@ function AdminDashboardContent() {
                       {item.is_available ? 'Aktif' : 'Non-aktif'}
                     </button>
 
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => moveMenuItem(idx, -1)}
+                        disabled={idx === 0}
+                        className="p-1.5 rounded text-[#78716C] hover:text-[#1C1917] hover:bg-[#FAF6F3] disabled:opacity-30 transition"
+                        title="Geser Urutan Naik"
+                      >
+                        <ArrowUp className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => moveMenuItem(idx, 1)}
+                        disabled={idx === menuItems.length - 1}
+                        className="p-1.5 rounded text-[#78716C] hover:text-[#1C1917] hover:bg-[#FAF6F3] disabled:opacity-30 transition"
+                        title="Geser Urutan Turun"
+                      >
+                        <ArrowDown className="w-3.5 h-3.5" />
+                      </button>
                       <button
                         onClick={() => openEditModal(item)}
                         className="p-1.5 rounded text-[#78716C] hover:text-[#1C1917] hover:bg-[#FAF6F3] transition"
@@ -686,9 +698,17 @@ function AdminDashboardContent() {
               <div className="flex flex-wrap items-center gap-2">
                 <input
                   type="date"
-                  value={dateFilter === 'ALL' ? '' : dateFilter}
+                  value={/^\d{4}-\d{2}-\d{2}$/.test(dateFilter) ? dateFilter : ''}
                   onChange={(e) => setDateFilter(e.target.value || getTodayWIB())}
                   className="px-2.5 py-1.5 rounded-md border border-[#DCD2CB] bg-white text-xs font-mono text-[#1C1917]"
+                  title="Filter per Tanggal"
+                />
+                <input
+                  type="month"
+                  value={/^\d{4}-\d{2}$/.test(dateFilter) ? dateFilter : ''}
+                  onChange={(e) => setDateFilter(e.target.value || getThisMonthWIB())}
+                  className="px-2.5 py-1.5 rounded-md border border-[#DCD2CB] bg-white text-xs font-mono text-[#1C1917]"
+                  title="Filter per Bulan"
                 />
                 <button
                   onClick={() => setDateFilter(getTodayWIB())}
@@ -699,6 +719,16 @@ function AdminDashboardContent() {
                   }`}
                 >
                   Hari Ini
+                </button>
+                <button
+                  onClick={() => setDateFilter(getThisMonthWIB())}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium border transition ${
+                    dateFilter === getThisMonthWIB()
+                      ? 'bg-[#D9381E] text-white border-[#D9381E] font-semibold'
+                      : 'bg-[#FAF6F3] text-[#57534E] border-[#DCD2CB] hover:bg-[#EFE8E2]'
+                  }`}
+                >
+                  Bulan Ini
                 </button>
                 <button
                   onClick={() => setDateFilter('ALL')}
@@ -716,7 +746,15 @@ function AdminDashboardContent() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white p-4 rounded-lg border border-[#E6DCD5] space-y-1">
                 <span className="text-xs font-medium text-[#78716C] block">
-                  {dateFilter === 'ALL' ? 'Total Omzet Keseluruhan' : dateFilter === getTodayWIB() ? 'Total Omzet Hari Ini' : `Total Omzet (${dateFilter})`}
+                  {dateFilter === 'ALL'
+                    ? 'Total Omzet Keseluruhan'
+                    : dateFilter === getTodayWIB()
+                      ? 'Total Omzet Hari Ini'
+                      : dateFilter === getThisMonthWIB()
+                        ? 'Total Omzet Bulan Ini'
+                        : /^\d{4}-\d{2}$/.test(dateFilter)
+                          ? `Total Omzet Bulan (${dateFilter})`
+                          : `Total Omzet (${dateFilter})`}
                 </span>
                 <div className="text-xl font-mono font-bold text-[#D9381E] tabular-nums">
                   Rp {totalOmzet.toLocaleString('id-ID')}
@@ -750,7 +788,13 @@ function AdminDashboardContent() {
                 </span>
                 <div className="text-xl font-mono font-bold text-[#1C1917] tabular-nums">{orders.length}</div>
                 <p className="text-[11px] text-[#78716C]">
-                  {dateFilter === 'ALL' ? 'Maks. 500 transaksi terakhir' : dateFilter === getTodayWIB() ? 'Seluruh antrean hari ini' : `Antrean tanggal ${dateFilter}`}
+                  {dateFilter === 'ALL'
+                    ? 'Maks. 500 transaksi terakhir'
+                    : dateFilter === getTodayWIB()
+                      ? 'Seluruh antrean hari ini'
+                      : dateFilter === getThisMonthWIB()
+                        ? 'Seluruh antrean bulan ini'
+                        : `Antrean periode ${dateFilter}`}
                 </p>
               </div>
             </div>
@@ -819,7 +863,8 @@ function AdminDashboardContent() {
                       filteredReportOrders.map((o) => (
                         <tr key={o.id} className="hover:bg-[#FAF6F3]/60">
                           <td className="py-2.5 px-4 font-mono font-semibold text-[#D9381E] tabular-nums">{o.queue_code}</td>
-                          <td className="py-2.5 px-4 font-mono text-[#78716C] tabular-nums">
+                          <td className="py-2.5 px-4 font-mono text-[#78716C] tabular-nums whitespace-nowrap">
+                            {new Date(o.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })}{' '}
                             {new Date(o.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
                           </td>
                           <td className="py-2.5 px-4 font-medium text-[#1C1917]">

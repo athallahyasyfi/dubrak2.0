@@ -174,3 +174,10 @@ export function deleteLocalMenuItem(id: string): boolean {
   }
   return false;
 }
+
+export function reorderLocalMenuItems(orderedIds: string[]): void {
+  const store = initMemoryStore();
+  const orderMap = new Map(orderedIds.map((id, idx) => [id, idx]));
+  store.menuItems.sort((a, b) => (orderMap.get(a.id) ?? 9999) - (orderMap.get(b.id) ?? 9999));
+  persistCurrentState();
+}
