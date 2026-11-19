@@ -249,8 +249,7 @@ function OrderDetailContent() {
                     src="/qris.jpg"
                     alt="QRIS Barcode Ayam Dubrak"
                     onError={(e) => {
-                      // Fallback ke qris.svg bila file qris.jpg belum ditaruh
-                      (e.target as HTMLImageElement).src = '/qris.svg';
+                      (e.target as HTMLImageElement).style.display = 'none';
                     }}
                     className="w-56 max-w-full h-auto rounded object-contain shadow-2xs"
                   />
