@@ -3,7 +3,6 @@ import { z } from 'zod';
 import {
   StaffRole,
   verifyStaffCredentials,
-  updateStaffCredentials,
   getStaffPublicInfo,
   createSignedSessionToken,
   getServerSession,
@@ -21,13 +20,6 @@ const loginSchema = z.object({
   username: z.string().min(1, 'Username wajib diisi').max(60),
   password: z.string().min(1, 'Password wajib diisi').max(120),
   rememberMe: z.boolean().optional().default(true),
-});
-
-const updateCredentialsSchema = z.object({
-  role: z.enum(['kasir', 'admin']),
-  currentPassword: z.string().min(1, 'Password saat ini wajib diisi'),
-  newUsername: z.string().min(3, 'Username baru minimal 3 karakter').max(50),
-  newPassword: z.string().min(6, 'Password baru minimal 6 karakter').max(100),
 });
 
 export async function GET(request: Request) {
@@ -140,71 +132,6 @@ export async function POST(request: Request) {
     }
     return NextResponse.json(
       { error: 'Gagal memproses autentikasi.' },
-      { status: 500 }
-    );
-  }
-}
-
-export async function PUT(request: Request) {
-  try {
-    const session = await getServerSession();
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Sesi tidak valid. Silakan login terlebih dahulu.' },
-        { status: 401 }
-      );
-    }
-
-    const body = await request.json();
-    const parsed = updateCredentialsSchema.parse(body);
-
-    // Kasir hanya boleh mengubah kredensial kasir, Admin boleh mengubah admin & kasir
-    if (session.role !== 'admin' && session.role !== parsed.role) {
-      return NextResponse.json(
-        { error: 'Anda tidak memiliki akses untuk mengubah akun ini.' },
-        { status: 403 }
-      );
-    }
-
-    const result = updateStaffCredentials(
-      parsed.role,
-      parsed.currentPassword,
-      parsed.newUsername,
-      parsed.newPassword
-    );
-
-    if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 400 });
-    }
-
-    // Perbarui token cookie jika mengubah akun yang sedang aktif
-    const response = NextResponse.json({
-      success: true,
-      username: result.username,
-      message: 'Kredensial akun berhasil diperbarui dan disimpan.',
-    });
-
-    if (session.role === parsed.role && result.username) {
-      const newToken = createSignedSessionToken(session.role, result.username, true);
-      response.cookies.set(SESSION_COOKIE_NAME, newToken, {
-        httpOnly: true,
-        sameSite: 'lax',
-        secure: process.env.NODE_ENV === 'production',
-        path: '/',
-        maxAge: 7 * 24 * 60 * 60,
-      });
-    }
-
-    return response;
-  } catch (err: any) {
-    if (err instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: err.issues.map((i) => i.message).join(', ') },
-        { status: 400 }
-      );
-    }
-    return NextResponse.json(
-      { error: 'Gagal menyimpan pengaturan akun.' },
       { status: 500 }
     );
   }

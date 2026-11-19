@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { MenuItem, Category } from '@/types';
-import { INITIAL_CATEGORIES, INITIAL_MENU_ITEMS } from '@/lib/data/mock-menu';
+import { INITIAL_MENU_ITEMS } from '@/lib/data/mock-menu';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const MENU_DATA_FILE = path.join(DATA_DIR, 'menu-data.json');

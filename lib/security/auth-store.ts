@@ -1,6 +1,4 @@
 import crypto from 'crypto';
-import fs from 'fs';
-import path from 'path';
 import { cookies } from 'next/headers';
 
 export type StaffRole = 'kasir' | 'admin';
@@ -8,102 +6,32 @@ export type StaffRole = 'kasir' | 'admin';
 export interface StaffAccountRecord {
   role: StaffRole;
   username: string;
-  passwordHash: string;
-  salt: string;
-  updatedAt: string;
 }
 
-interface CredentialsFileSchema {
-  secretKey: string;
-  accounts: Record<StaffRole, StaffAccountRecord>;
-}
-
-const DATA_DIR = path.join(process.cwd(), 'data');
-const CREDENTIALS_FILE = path.join(DATA_DIR, 'staff-credentials.json');
 export const SESSION_COOKIE_NAME = 'dubrak_staff_session';
-
-function hashPasswordWithSalt(password: string, salt: string): string {
-  return crypto.pbkdf2Sync(password, salt, 100_000, 64, 'sha256').toString('hex');
-}
-
-function createAccountRecord(role: StaffRole, username: string, rawPassword: string): StaffAccountRecord {
-  const salt = crypto.randomBytes(16).toString('hex');
-  return {
-    role,
-    username: username.trim().toLowerCase(),
-    passwordHash: hashPasswordWithSalt(rawPassword, salt),
-    salt,
-    updatedAt: new Date().toISOString(),
-  };
-}
-
-function ensureStoreInitialized(): CredentialsFileSchema {
-  try {
-    if (fs.existsSync(CREDENTIALS_FILE)) {
-      const raw = fs.readFileSync(CREDENTIALS_FILE, 'utf-8');
-      const parsed = JSON.parse(raw) as CredentialsFileSchema;
-      if (parsed && parsed.accounts && parsed.accounts.kasir && parsed.accounts.admin && parsed.secretKey) {
-        return parsed;
-      }
-    }
-  } catch (err) {
-    console.warn('Re-initializing staff credentials store:', err);
-  }
-
-  const initialKasirUser = process.env.KASIR_USERNAME || 'kasir';
-  const initialKasirPass = process.env.KASIR_PASSWORD || 'kasir123';
-  const initialAdminUser = process.env.ADMIN_USERNAME || 'admin';
-  const initialAdminPass = process.env.ADMIN_PASSWORD || 'admin123';
-  const secretKey = process.env.AUTH_SECRET || crypto.randomBytes(32).toString('hex');
-
-  const initialData: CredentialsFileSchema = {
-    secretKey,
-    accounts: {
-      kasir: createAccountRecord('kasir', initialKasirUser, initialKasirPass),
-      admin: createAccountRecord('admin', initialAdminUser, initialAdminPass),
-    },
-  };
-
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    fs.writeFileSync(CREDENTIALS_FILE, JSON.stringify(initialData, null, 2), 'utf-8');
-  } catch (err) {
-    console.warn('Could not write credentials file to disk, using in-memory fallback:', err);
-  }
-
-  return initialData;
-}
-
-let memoryStoreCache: CredentialsFileSchema | null = null;
-
-function getStore(): CredentialsFileSchema {
-  if (memoryStoreCache) {
-    return memoryStoreCache;
-  }
-  memoryStoreCache = ensureStoreInitialized();
-  return memoryStoreCache;
-}
+const FALLBACK_SECRET = crypto.randomBytes(32).toString('hex');
 
 function getSigningSecret(): string {
-  const envSecret = process.env.AUTH_SECRET?.trim();
-  if (envSecret) {
-    return envSecret;
-  }
-  return getStore().secretKey;
+  return process.env.AUTH_SECRET?.trim() || FALLBACK_SECRET;
 }
 
-function saveStore(store: CredentialsFileSchema): void {
-  memoryStoreCache = store;
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    fs.writeFileSync(CREDENTIALS_FILE, JSON.stringify(store, null, 2), 'utf-8');
-  } catch (err) {
-    console.warn('Failed to persist credentials file:', err);
+function getExpectedCredentials(role: StaffRole): { username: string; password: string } {
+  if (role === 'admin') {
+    return {
+      username: (process.env.ADMIN_USERNAME || 'admin').trim().toLowerCase(),
+      password: process.env.ADMIN_PASSWORD || 'admin123',
+    };
   }
+  return {
+    username: (process.env.KASIR_USERNAME || 'kasir').trim().toLowerCase(),
+    password: process.env.KASIR_PASSWORD || 'kasir123',
+  };
+}
+
+function timingSafeCompare(a: string, b: string): boolean {
+  const hashA = crypto.createHash('sha256').update(a).digest();
+  const hashB = crypto.createHash('sha256').update(b).digest();
+  return crypto.timingSafeEqual(hashA, hashB);
 }
 
 export function verifyStaffCredentials(
@@ -111,67 +39,20 @@ export function verifyStaffCredentials(
   usernameInput: string,
   passwordInput: string
 ): { valid: boolean; account?: StaffAccountRecord } {
-  const store = getStore();
-  const account = store.accounts[role];
-  if (!account) return { valid: false };
-
+  const expected = getExpectedCredentials(role);
   const normalizedUser = usernameInput.trim().toLowerCase();
-  if (normalizedUser !== account.username) {
+  const userMatch = timingSafeCompare(normalizedUser, expected.username);
+  const passMatch = timingSafeCompare(passwordInput, expected.password);
+
+  if (!userMatch || !passMatch) {
     return { valid: false };
   }
-
-  const computedHash = hashPasswordWithSalt(passwordInput, account.salt);
-  const a = Buffer.from(computedHash, 'hex');
-  const b = Buffer.from(account.passwordHash, 'hex');
-
-  if (a.length !== b.length) return { valid: false };
-  const isMatch = crypto.timingSafeEqual(a, b);
-  return isMatch ? { valid: true, account } : { valid: false };
+  return { valid: true, account: { role, username: expected.username } };
 }
 
-export function updateStaffCredentials(
-  role: StaffRole,
-  currentPassword: string,
-  newUsername: string,
-  newPassword: string
-): { success: boolean; error?: string; username?: string } {
-  const store = getStore();
-  const existing = store.accounts[role];
-  if (!existing) {
-    return { success: false, error: 'Akun peran tidak ditemukan.' };
-  }
-
-  // Verifikasi password lama terlebih dahulu
-  const computedCurrent = hashPasswordWithSalt(currentPassword, existing.salt);
-  const a = Buffer.from(computedCurrent, 'hex');
-  const b = Buffer.from(existing.passwordHash, 'hex');
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
-    return { success: false, error: 'Password saat ini tidak sesuai.' };
-  }
-
-  const cleanUsername = newUsername.trim().toLowerCase();
-  if (cleanUsername.length < 3) {
-    return { success: false, error: 'Username minimal 3 karakter.' };
-  }
-  if (newPassword.length < 6) {
-    return { success: false, error: 'Password baru minimal 6 karakter.' };
-  }
-
-  const updatedRecord = createAccountRecord(role, cleanUsername, newPassword);
-  store.accounts[role] = updatedRecord;
-  saveStore(store);
-
-  return { success: true, username: updatedRecord.username };
-}
-
-export function getStaffPublicInfo(role: StaffRole): { role: StaffRole; username: string; updatedAt: string } {
-  const store = getStore();
-  const acc = store.accounts[role];
-  return {
-    role,
-    username: acc.username,
-    updatedAt: acc.updatedAt,
-  };
+export function getStaffPublicInfo(role: StaffRole): { role: StaffRole; username: string } {
+  const expected = getExpectedCredentials(role);
+  return { role, username: expected.username };
 }
 
 export interface SessionPayload {
@@ -182,7 +63,7 @@ export interface SessionPayload {
 
 export function createSignedSessionToken(role: StaffRole, username: string, rememberMe: boolean): string {
   const secret = getSigningSecret();
-  const ttlMs = rememberMe ? 7 * 24 * 60 * 60 * 1000 : 12 * 60 * 60 * 1000; // 7 hari atau 12 jam
+  const ttlMs = rememberMe ? 7 * 24 * 60 * 60 * 1000 : 12 * 60 * 60 * 1000;
   const payload: SessionPayload = {
     role,
     username,

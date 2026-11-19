@@ -1,6 +1,4 @@
-import { Category, MenuItem } from '@/types';
-
-export const INITIAL_CATEGORIES: Category[] = [];
+import { MenuItem } from '@/types';
 
 export const INITIAL_MENU_ITEMS: MenuItem[] = [
   {
