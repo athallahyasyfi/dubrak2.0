@@ -6,6 +6,8 @@ import { ArrowLeft, Plus, Edit2, Trash2, X, Check, Layers, Tag, Banknote, Credit
 import Link from 'next/link';
 import { StaffAuthGate } from '@/components/auth/StaffAuthGate';
 
+const getTodayWIB = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
+
 function AdminDashboardContent() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -13,6 +15,7 @@ function AdminDashboardContent() {
   const [activeTab, setActiveTab] = useState<'laporan' | 'menu'>('menu');
   const [loading, setLoading] = useState(true);
   const [paymentFilter, setPaymentFilter] = useState<'ALL' | 'CASH' | 'QRIS'>('ALL');
+  const [dateFilter, setDateFilter] = useState<string>(getTodayWIB);
 
   // Modal CRUD State Menu
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -116,9 +119,10 @@ function AdminDashboardContent() {
     }
   };
 
-  const fetchOrders = async () => {
+  const fetchOrders = async (targetDate: string = dateFilter) => {
     try {
-      const res = await fetch('/api/orders');
+      const query = targetDate && targetDate !== 'ALL' ? `?date=${encodeURIComponent(targetDate)}` : '';
+      const res = await fetch(`/api/orders${query}`);
       if (res.ok) {
         const data = await res.json();
         if (data.orders) setOrders(data.orders);
@@ -130,8 +134,11 @@ function AdminDashboardContent() {
 
   useEffect(() => {
     fetchMenuData();
-    fetchOrders();
   }, []);
+
+  useEffect(() => {
+    fetchOrders(dateFilter);
+  }, [dateFilter]);
 
   // Category Handlers
   const handleAddCategory = async (name: string) => {
@@ -673,10 +680,43 @@ function AdminDashboardContent() {
         ) : (
           /* TAB LAPORAN */
           <div className="space-y-6">
+            {/* Filter Periode Tanggal */}
+            <div className="bg-white p-3.5 rounded-lg border border-[#E6DCD5] flex flex-wrap items-center justify-between gap-3">
+              <span className="text-xs font-semibold text-[#1C1917]">Periode Laporan:</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="date"
+                  value={dateFilter === 'ALL' ? '' : dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value || getTodayWIB())}
+                  className="px-2.5 py-1.5 rounded-md border border-[#DCD2CB] bg-white text-xs font-mono text-[#1C1917]"
+                />
+                <button
+                  onClick={() => setDateFilter(getTodayWIB())}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium border transition ${
+                    dateFilter === getTodayWIB()
+                      ? 'bg-[#D9381E] text-white border-[#D9381E] font-semibold'
+                      : 'bg-[#FAF6F3] text-[#57534E] border-[#DCD2CB] hover:bg-[#EFE8E2]'
+                  }`}
+                >
+                  Hari Ini
+                </button>
+                <button
+                  onClick={() => setDateFilter('ALL')}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium border transition ${
+                    dateFilter === 'ALL'
+                      ? 'bg-[#1C1917] text-white border-[#1C1917] font-semibold'
+                      : 'bg-[#FAF6F3] text-[#57534E] border-[#DCD2CB] hover:bg-[#EFE8E2]'
+                  }`}
+                >
+                  Semua Hari
+                </button>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white p-4 rounded-lg border border-[#E6DCD5] space-y-1">
                 <span className="text-xs font-medium text-[#78716C] block">
-                  Total Omzet Hari Ini
+                  {dateFilter === 'ALL' ? 'Total Omzet Keseluruhan' : dateFilter === getTodayWIB() ? 'Total Omzet Hari Ini' : `Total Omzet (${dateFilter})`}
                 </span>
                 <div className="text-xl font-mono font-bold text-[#D9381E] tabular-nums">
                   Rp {totalOmzet.toLocaleString('id-ID')}
@@ -709,7 +749,9 @@ function AdminDashboardContent() {
                   Total Pesanan Masuk
                 </span>
                 <div className="text-xl font-mono font-bold text-[#1C1917] tabular-nums">{orders.length}</div>
-                <p className="text-[11px] text-[#78716C]">Seluruh antrean hari ini</p>
+                <p className="text-[11px] text-[#78716C]">
+                  {dateFilter === 'ALL' ? 'Maks. 500 transaksi terakhir' : dateFilter === getTodayWIB() ? 'Seluruh antrean hari ini' : `Antrean tanggal ${dateFilter}`}
+                </p>
               </div>
             </div>
 

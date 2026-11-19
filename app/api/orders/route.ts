@@ -41,6 +41,8 @@ const createOrderSchema = z.object({
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
+  const date = searchParams.get('date');
+  const isValidDate = Boolean(date && /^\d{4}-\d{2}-\d{2}$/.test(date));
 
   // Coba ambil dari Supabase jika env terisi
   if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
@@ -54,10 +56,20 @@ export async function GET(request: Request) {
           .single();
         if (!error && data) return NextResponse.json({ order: data });
       } else {
-        const { data, error } = await supabase
+        let query = supabase
           .from('orders')
           .select('*')
           .order('created_at', { ascending: false });
+
+        if (isValidDate) {
+          query = query
+            .gte('created_at', `${date}T00:00:00+07:00`)
+            .lte('created_at', `${date}T23:59:59.999+07:00`);
+        } else {
+          query = query.limit(500);
+        }
+
+        const { data, error } = await query;
         if (!error && data) return NextResponse.json({ orders: data });
       }
     } catch (e) {
@@ -73,7 +85,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ order: found });
   }
 
-  return NextResponse.json({ orders: localOrders });
+  const filteredLocal = isValidDate
+    ? localOrders.filter(
+        (o) => new Date(o.created_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' }) === date
+      )
+    : localOrders;
+
+  return NextResponse.json({ orders: filteredLocal });
 }
 
 async function getActiveCatalog(): Promise<MenuItem[]> {

@@ -20,6 +20,8 @@ import {
   Bell,
 } from 'lucide-react';
 
+const getTodayWIB = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
+
 function KasirDashboardContent() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -152,7 +154,7 @@ function KasirDashboardContent() {
 
   const fetchOrders = async () => {
     try {
-      const res = await fetch('/api/orders');
+      const res = await fetch(`/api/orders?date=${getTodayWIB()}`);
       if (res.ok) {
         const data = await res.json();
         const incomingOrders: Order[] = data.orders || [];
