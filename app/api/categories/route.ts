@@ -18,7 +18,7 @@ export async function GET() {
         .select('*')
         .order('sort_order', { ascending: true });
 
-      if (!error && dbCategories && dbCategories.length > 0) {
+      if (!error && dbCategories) {
         return NextResponse.json({ categories: dbCategories });
       }
     } catch (e) {
@@ -80,27 +80,29 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'ID dan nama kategori wajib diisi' }, { status: 400 });
     }
 
+    let supaUpdated = false;
     if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
       try {
         const supabase = createAdminClient();
-        await supabase
+        const { error } = await supabase
           .from('categories')
           .update({
             name: name.trim(),
             ...(sort_order !== undefined ? { sort_order } : {}),
           })
           .eq('id', id);
+        supaUpdated = !error;
       } catch (err) {
         console.warn('Supabase category update failed:', err);
       }
     }
 
     const updated = updateLocalCategory(id, name.trim(), sort_order);
-    if (!updated) {
+    if (!updated && !supaUpdated) {
       return NextResponse.json({ error: 'Kategori tidak ditemukan' }, { status: 404 });
     }
 
-    return NextResponse.json({ category: updated });
+    return NextResponse.json({ category: updated || { id, name: name.trim(), ...(sort_order !== undefined ? { sort_order } : {}) } });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Gagal mengubah kategori' }, { status: 500 });
   }

@@ -23,7 +23,7 @@ export async function GET() {
         .select('*')
         .order('sort_order', { ascending: true });
 
-      if (dbCategories && dbCategories.length > 0) {
+      if (dbCategories) {
         categories = dbCategories;
       }
 
@@ -32,7 +32,7 @@ export async function GET() {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (!error && dbMenus && dbMenus.length > 0) {
+      if (!error && dbMenus) {
         // Map ke format MenuItem
         const mappedItems: MenuItem[] = dbMenus.map((m: any) => ({
           id: m.id,
@@ -143,6 +143,7 @@ export async function PUT(request: Request) {
     if (is_available !== undefined) updatePayload.is_available = is_available;
     if (modifier_groups !== undefined) updatePayload.modifier_groups = modifier_groups;
 
+    let supaUpdated = false;
     if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
       try {
         const supabase = createAdminClient();
@@ -155,21 +156,22 @@ export async function PUT(request: Request) {
         if (updatePayload.is_available !== undefined) supaPayload.is_available = updatePayload.is_available;
         if (updatePayload.modifier_groups !== undefined) supaPayload.modifier_groups = updatePayload.modifier_groups;
 
-        await supabase
+        const { error } = await supabase
           .from('menus')
           .update(supaPayload)
           .eq('id', id);
+        supaUpdated = !error;
       } catch (err) {
         console.warn('Supabase update failed:', err);
       }
     }
 
     const updated = updateLocalMenuItem(id, updatePayload);
-    if (!updated) {
+    if (!updated && !supaUpdated) {
       return NextResponse.json({ error: 'Menu tidak ditemukan' }, { status: 404 });
     }
 
-    return NextResponse.json({ item: updated });
+    return NextResponse.json({ item: updated || { id, ...updatePayload } });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Gagal mengubah menu' }, { status: 500 });
   }

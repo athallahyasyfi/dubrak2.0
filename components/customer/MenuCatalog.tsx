@@ -7,15 +7,11 @@ import { MenuItemModal } from './MenuItemModal';
 import { CartDrawer } from './CartDrawer';
 import { ShoppingBag, MapPin, Plus } from 'lucide-react';
 
-interface MenuCatalogProps {
-  categories: Category[];
-  menuItems: MenuItem[];
-}
-
-export function MenuCatalog({ categories: initialCategories, menuItems: initialMenuItems }: MenuCatalogProps) {
+export function MenuCatalog() {
   const { totalCount, totalAmount, addItem } = useCart();
-  const [categories, setCategories] = useState<Category[]>(initialCategories);
-  const [menuItems, setMenuItems] = useState<MenuItem[]>(initialMenuItems);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [activeItemForModal, setActiveItemForModal] = useState<MenuItem | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -28,7 +24,8 @@ export function MenuCatalog({ categories: initialCategories, menuItems: initialM
         if (data.categories) setCategories(data.categories);
         if (data.menuItems) setMenuItems(data.menuItems);
       })
-      .catch((err) => console.warn(err));
+      .catch((err) => console.warn(err))
+      .finally(() => setLoading(false));
   }, []);
 
   const filteredItems = selectedCategory === 'all'
@@ -105,68 +102,83 @@ export function MenuCatalog({ categories: initialCategories, menuItems: initialM
             Pilihan Menu Tersedia
           </h2>
           <span className="text-xs font-mono text-[#78716C]">
-            {filteredItems.length} menu
+            {loading ? 'Memuat...' : `${filteredItems.length} menu`}
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-          {filteredItems.map((item) => (
-            <div
-              key={item.id}
-              className="bg-white rounded-lg p-4 border border-[#E6DCD5] hover:border-[#D9381E]/50 transition flex flex-col justify-between"
-            >
-              <div>
-                {/* Foto Piring Melingkar Sesuai Referensi, Kontras dengan Card Sudut Tegas */}
-                <div className="flex justify-center mb-3">
-                  <div className="w-24 h-24 rounded-full p-1 border-2 border-[#D9381E] bg-[#FAF6F3] overflow-hidden">
-                    {item.image_url ? (
-                      <img
-                        src={item.image_url}
-                        alt={item.name}
-                        className="w-full h-full rounded-full object-cover"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="w-full h-full rounded-full bg-[#FCEAE6] flex items-center justify-center font-semibold text-xs text-[#D9381E]">
-                        Dubrak
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Judul & Deskripsi */}
-                <h3 className="font-semibold text-sm text-[#1C1917] text-center line-clamp-1">
-                  {item.name}
-                </h3>
-                {item.description && (
-                  <p className="text-xs text-[#78716C] text-center mt-1 line-clamp-2 leading-relaxed">
-                    {item.description}
-                  </p>
-                )}
-              </div>
-
-              {/* Harga & Tombol Pilih */}
-              <div className="mt-4 pt-3 border-t border-[#EFE8E2] flex items-center justify-between gap-2">
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            {[1, 2, 3, 4].map((n) => (
+              <div
+                key={n}
+                className="animate-pulse bg-white rounded-lg p-4 border border-[#E6DCD5] h-56"
+              />
+            ))}
+          </div>
+        ) : filteredItems.length === 0 ? (
+          <div className="bg-white rounded-lg p-8 border border-[#E6DCD5] text-center text-xs text-[#78716C]">
+            Belum ada menu di kategori ini.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            {filteredItems.map((item) => (
+              <div
+                key={item.id}
+                className="bg-white rounded-lg p-4 border border-[#E6DCD5] hover:border-[#D9381E]/50 transition flex flex-col justify-between"
+              >
                 <div>
-                  <span className="text-[11px] text-[#78716C] block leading-none">Harga</span>
-                  <span className="text-sm font-mono font-semibold text-[#1C1917] tabular-nums mt-1 block">
-                    Rp {item.base_price.toLocaleString('id-ID')}
-                  </span>
+                  {/* Foto Piring Melingkar Sesuai Referensi, Kontras dengan Card Sudut Tegas */}
+                  <div className="flex justify-center mb-3">
+                    <div className="w-24 h-24 rounded-full p-1 border-2 border-[#D9381E] bg-[#FAF6F3] overflow-hidden">
+                      {item.image_url ? (
+                        <img
+                          src={item.image_url}
+                          alt={item.name}
+                          className="w-full h-full rounded-full object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="w-full h-full rounded-full bg-[#FCEAE6] flex items-center justify-center font-semibold text-xs text-[#D9381E]">
+                          Dubrak
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Judul & Deskripsi */}
+                  <h3 className="font-semibold text-sm text-[#1C1917] text-center line-clamp-1">
+                    {item.name}
+                  </h3>
+                  {item.description && (
+                    <p className="text-xs text-[#78716C] text-center mt-1 line-clamp-2 leading-relaxed">
+                      {item.description}
+                    </p>
+                  )}
                 </div>
 
-                <button
-                  type="button"
-                  disabled={!item.is_available}
-                  onClick={() => setActiveItemForModal(item)}
-                  className="px-3.5 py-2 rounded-md bg-[#D9381E] hover:bg-[#C02E16] disabled:bg-stone-200 disabled:text-stone-500 text-white font-semibold text-xs flex items-center gap-1.5 transition"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>{item.is_available ? 'Pilih' : 'Habis'}</span>
-                </button>
+                {/* Harga & Tombol Pilih */}
+                <div className="mt-4 pt-3 border-t border-[#EFE8E2] flex items-center justify-between gap-2">
+                  <div>
+                    <span className="text-[11px] text-[#78716C] block leading-none">Harga</span>
+                    <span className="text-sm font-mono font-semibold text-[#1C1917] tabular-nums mt-1 block">
+                      Rp {item.base_price.toLocaleString('id-ID')}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={!item.is_available}
+                    onClick={() => setActiveItemForModal(item)}
+                    className="px-3.5 py-2 rounded-md bg-[#D9381E] hover:bg-[#C02E16] disabled:bg-stone-200 disabled:text-stone-500 text-white font-semibold text-xs flex items-center gap-1.5 transition"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{item.is_available ? 'Pilih' : 'Habis'}</span>
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </main>
 
       {/* Bar Checkout Mengambang */}
