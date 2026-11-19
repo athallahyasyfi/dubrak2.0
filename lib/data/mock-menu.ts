@@ -1,0 +1,133 @@
+import { Category, MenuItem } from '@/types';
+
+export const INITIAL_CATEGORIES: Category[] = [];
+
+export const INITIAL_MENU_ITEMS: MenuItem[] = [
+  {
+    id: 'item-1',
+    category_id: 'cat-paket',
+    name: 'Paket Ayam Dubrak Komplit',
+    description: 'Nasi hangat + Ayam krispi gurih khas Dubrak + Sambal pilihan + Tahu & Tempe + Lalapan segar.',
+    base_price: 22000,
+    image_url: 'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=600&q=80',
+    is_available: true,
+    modifier_groups: [
+      {
+        id: 'group-sambal-1',
+        menu_item_id: 'item-1',
+        title: 'Pilihan Sambal (Wajib Pilih 1)',
+        is_required: true,
+        min_selection: 1,
+        max_selection: 1,
+        options: [
+          { id: 'opt-sambal-1', group_id: 'group-sambal-1', name: 'Sambal Korek Bawang Pedas', price: 0, is_available: true },
+          { id: 'opt-sambal-2', group_id: 'group-sambal-1', name: 'Sambal Matah Bali Segar', price: 0, is_available: true },
+          { id: 'opt-sambal-3', group_id: 'group-sambal-1', name: 'Sambal Ijo Gurih', price: 0, is_available: true },
+          { id: 'opt-sambal-4', group_id: 'group-sambal-1', name: 'Sambal Terasi Jeruk Limau', price: 0, is_available: true },
+        ],
+      },
+      {
+        id: 'group-addon-1',
+        menu_item_id: 'item-1',
+        title: 'Extra Add-ons / Topping (Opsional)',
+        is_required: false,
+        min_selection: 0,
+        max_selection: 10,
+        options: [
+          { id: 'opt-addon-1', group_id: 'group-addon-1', name: 'Extra Keju Mozarella Leleh', price: 5000, is_available: true },
+          { id: 'opt-addon-2', group_id: 'group-addon-1', name: 'Extra Kol Goreng Gurih', price: 3000, is_available: true },
+          { id: 'opt-addon-3', group_id: 'group-addon-1', name: 'Extra Sambal (Porsi Dobel)', price: 3000, is_available: true },
+          { id: 'opt-addon-4', group_id: 'group-addon-1', name: 'Extra Telur Dadar Crispy', price: 4000, is_available: true },
+          { id: 'opt-addon-5', group_id: 'group-addon-1', name: 'Extra Nasi Putih', price: 4000, is_available: true },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'item-2',
+    category_id: 'cat-paket',
+    name: 'Paket Ayam Dubrak Geprek Jumbo',
+    description: 'Ayam krispi digeprek hancur dengan sambal pilihan melimpah + Nasi hangat porsi jumbo.',
+    base_price: 24000,
+    image_url: 'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?auto=format&fit=crop&w=600&q=80',
+    is_available: true,
+    modifier_groups: [
+      {
+        id: 'group-sambal-2',
+        menu_item_id: 'item-2',
+        title: 'Pilihan Sambal (Wajib Pilih 1)',
+        is_required: true,
+        min_selection: 1,
+        max_selection: 1,
+        options: [
+          { id: 'opt-sambal-21', group_id: 'group-sambal-2', name: 'Sambal Korek Bawang Pedas', price: 0, is_available: true },
+          { id: 'opt-sambal-22', group_id: 'group-sambal-2', name: 'Sambal Matah Bali Segar', price: 0, is_available: true },
+          { id: 'opt-sambal-23', group_id: 'group-sambal-2', name: 'Sambal Ijo Gurih', price: 0, is_available: true },
+        ],
+      },
+      {
+        id: 'group-addon-2',
+        menu_item_id: 'item-2',
+        title: 'Extra Add-ons / Topping (Opsional)',
+        is_required: false,
+        min_selection: 0,
+        max_selection: 10,
+        options: [
+          { id: 'opt-addon-21', group_id: 'group-addon-2', name: 'Extra Keju Mozarella Leleh', price: 5000, is_available: true },
+          { id: 'opt-addon-22', group_id: 'group-addon-2', name: 'Extra Kol Goreng Gurih', price: 3000, is_available: true },
+          { id: 'opt-addon-23', group_id: 'group-addon-2', name: 'Extra Sambal (Porsi Dobel)', price: 3000, is_available: true },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'item-3',
+    category_id: 'cat-alacarte',
+    name: 'Ayam Crispy Dubrak Saja (Tanpa Nasi)',
+    description: '1 potong ayam crispy dubrak gurih renyah + sambal pilihan.',
+    base_price: 16000,
+    image_url: 'https://images.unsplash.com/photo-1569058242253-92a9c755a0ec?auto=format&fit=crop&w=600&q=80',
+    is_available: true,
+    modifier_groups: [
+      {
+        id: 'group-sambal-3',
+        menu_item_id: 'item-3',
+        title: 'Pilihan Sambal (Wajib Pilih 1)',
+        is_required: true,
+        min_selection: 1,
+        max_selection: 1,
+        options: [
+          { id: 'opt-sambal-31', group_id: 'group-sambal-3', name: 'Sambal Korek Bawang', price: 0, is_available: true },
+          { id: 'opt-sambal-32', group_id: 'group-sambal-3', name: 'Sambal Matah', price: 0, is_available: true },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'item-4',
+    category_id: 'cat-minuman',
+    name: 'Es Teh Manis Jumbo',
+    description: 'Teh melati wangi asli, manis pas, disajikan dingin dengan es melimpah.',
+    base_price: 4000,
+    image_url: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?auto=format&fit=crop&w=600&q=80',
+    is_available: true,
+  },
+  {
+    id: 'item-5',
+    category_id: 'cat-minuman',
+    name: 'Es Jeruk Peras Segar',
+    description: 'Jeruk peras murni asli, asam manis segar alami.',
+    base_price: 6000,
+    image_url: 'https://images.unsplash.com/photo-1613478223719-2ab802602423?auto=format&fit=crop&w=600&q=80',
+    is_available: true,
+  },
+  {
+    id: 'item-6',
+    category_id: 'cat-snack',
+    name: 'Tahu & Tempe Goreng Krispi',
+    description: '1 porsi tahu dan tempe goreng gurih dengan bumbu meresap.',
+    base_price: 7000,
+    image_url: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80',
+    is_available: true,
+  },
+];

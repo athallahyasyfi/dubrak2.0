@@ -1,0 +1,21 @@
+{
+  "name": "Ayam Dubrak! — Kios & Kasir POS",
+  "short_name": "Ayam Dubrak",
+  "description": "Sistem Pemesanan Kios QR & Kasir POS Ayam Dubrak",
+  "start_url": "/kasir",
+  "display": "standalone",
+  "background_color": "#FAF6F3",
+  "theme_color": "#D9381E",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
