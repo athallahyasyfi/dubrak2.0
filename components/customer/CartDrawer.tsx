@@ -376,7 +376,7 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                       <div>
                         <span className="font-semibold text-xs block leading-tight">QRIS</span>
                         <span className="text-[10px] text-[#78716C] block leading-tight mt-0.5">
-                          Scan Barcode QRIS
+                          Scan QRIS &amp; kirim bukti via WA
                         </span>
                       </div>
                     </button>
@@ -394,7 +394,7 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                       <div>
                         <span className="font-semibold text-xs block leading-tight">Tunai / Cash</span>
                         <span className="text-[10px] text-[#78716C] block leading-tight mt-0.5">
-                          Bayar di Meja Kasir
+                          Bayar saat ambil / di tempat
                         </span>
                       </div>
                     </button>

@@ -68,12 +68,19 @@ function OrderDetailContent() {
   const getStatusBadge = () => {
     switch (order.status) {
       case 'MENUNGGU_BAYAR':
-        return {
-          label: 'Menunggu Pembayaran di Kasir',
-          dot: 'bg-amber-500',
-          badgeBg: 'bg-amber-50 text-amber-800 border-amber-200',
-          desc: 'Tunjukkan nomor pesanan ini ke kasir untuk membayar dengan Tunai atau QRIS.',
-        };
+        return order.payment_method === 'CASH'
+          ? {
+              label: 'Menunggu Konfirmasi (Tunai)',
+              dot: 'bg-amber-500',
+              badgeBg: 'bg-amber-50 text-amber-800 border-amber-200',
+              desc: 'Konfirmasi pesanan ke WhatsApp kami, pembayaran tunai dilakukan saat pengambilan.',
+            }
+          : {
+              label: 'Menunggu Pembayaran QRIS',
+              dot: 'bg-amber-500',
+              badgeBg: 'bg-amber-50 text-amber-800 border-amber-200',
+              desc: 'Scan QRIS di bawah lalu kirim bukti bayar ke WhatsApp kami agar pesanan segera dimasak.',
+            };
       case 'DIPROSES':
         return {
           label: 'Sedang Dimasak di Dapur',
@@ -86,7 +93,7 @@ function OrderDetailContent() {
           label: 'Pesanan Siap Diambil',
           dot: 'bg-emerald-500',
           badgeBg: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-          desc: 'Pesanan sudah selesai dibungkus. Silakan ambil di meja kasir.',
+          desc: 'Pesanan sudah selesai dibungkus dan siap diambil / dikirim.',
         };
       case 'SELESAI':
         return {
@@ -114,13 +121,13 @@ function OrderDetailContent() {
 
     if (isUnpaid && isCash) {
       const lines = [
-        `Halo Ayam Dubrak! Saya ingin konfirmasi pesanan (Bayar Tunai di Kasir):`,
+        `Halo Ayam Dubrak! Saya ingin konfirmasi pesanan (Bayar Tunai):`,
         ``,
         `*Nomor Pesanan:* ${order.queue_code}`,
         `*Nama Pemesan:* ${order.customer_name}`,
         `*WhatsApp:* ${order.customer_phone}`,
         `*Jam Pickup:* ${pickupTimeStr}`,
-        `*Metode:* Tunai / Cash di Meja Kasir`,
+        `*Metode:* Tunai / Cash (Bayar saat ambil / di tempat)`,
         `*Total Tagihan:* Rp ${order.total_amount.toLocaleString('id-ID')}`,
         ``,
         `Mohon segera disiapkan ya. Terima kasih!`,
@@ -195,13 +202,13 @@ function OrderDetailContent() {
           {/* BLOK PEMBAYARAN SAAT MENUNGGU BAYAR */}
           {isUnpaid ? (
             order.payment_method === 'CASH' ? (
-              /* Blok Pembayaran Tunai di Kasir */
+              /* Blok Pembayaran Tunai */
               <div className="bg-[#FAF6F3] p-4 rounded-lg border border-[#E6DCD5] space-y-3.5 text-left">
                 <div className="flex items-center justify-between border-b border-[#EFE8E2] pb-2.5">
                   <div className="flex items-center gap-1.5">
                     <Banknote className="w-4 h-4 text-emerald-700" />
                     <span className="font-semibold text-xs text-[#1C1917]">
-                      Pembayaran Tunai di Kasir
+                      Pembayaran Tunai
                     </span>
                   </div>
                   <span className="font-mono font-bold text-sm text-[#D9381E] tabular-nums">
@@ -214,7 +221,7 @@ function OrderDetailContent() {
                     Petunjuk Pembayaran Tunai:
                   </span>
                   <p className="text-[#57534E] text-[11px] leading-relaxed">
-                    Silakan sebutkan nomor pesanan <strong>{order.queue_code}</strong> dan selesaikan pembayaran tunai di meja kasir saat mengambil pesanan.
+                    Silakan konfirmasi pesanan <strong>{order.queue_code}</strong> lewat WhatsApp dan selesaikan pembayaran tunai saat pengambilan pesanan.
                   </p>
                 </div>
 
