@@ -18,9 +18,25 @@ import {
   Zap,
   Clock,
   Bell,
+  MessageCircle,
 } from 'lucide-react';
 
 const getTodayWIB = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
+
+function buildCustomerWaUrl(order: Order, targetStatus: OrderStatus = order.status): string | null {
+  let digits = (order.customer_phone || '').replace(/\D/g, '');
+  if (digits.startsWith('00')) digits = digits.slice(2);
+  if (digits.startsWith('0')) digits = '62' + digits.slice(1);
+  else if (digits.startsWith('8')) digits = '62' + digits;
+  if (digits.length < 9) return null;
+
+  const isDone = targetStatus === 'SIAP_DIAMBIL' || targetStatus === 'SELESAI';
+  const msg = isDone
+    ? `Halo Kak ${order.customer_name}, pesanan Ayam Dubrak! dengan nomor *${order.queue_code}* sudah *SIAP DIAMBIL* ya. Silakan diambil di outlet. Terima kasih!`
+    : `Halo Kak ${order.customer_name}, kami dari Ayam Dubrak! ingin mengonfirmasi pesanan *${order.queue_code}*.`;
+
+  return `https://wa.me/${digits}?text=${encodeURIComponent(msg)}`;
+}
 
 function KasirDashboardContent() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -617,10 +633,14 @@ function KasirDashboardContent() {
 
                       {isCooking && (
                         <button
-                          onClick={() => handleUpdateStatus(order.id, 'SIAP_DIAMBIL')}
+                          onClick={() => {
+                            const waUrl = buildCustomerWaUrl(order, 'SIAP_DIAMBIL');
+                            if (waUrl) window.open(waUrl, '_blank', 'noopener,noreferrer');
+                            handleUpdateStatus(order.id, 'SIAP_DIAMBIL');
+                          }}
                           className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-3 rounded-md text-xs transition"
                         >
-                          Tandai Siap Diambil
+                          Siap Diambil & WA
                         </button>
                       )}
 
@@ -632,6 +652,21 @@ function KasirDashboardContent() {
                           Selesaikan Pesanan
                         </button>
                       )}
+
+                      {(() => {
+                        const waUrl = buildCustomerWaUrl(order);
+                        return waUrl ? (
+                          <a
+                            href={waUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 rounded-md border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition"
+                            title="Kirim WhatsApp ke Pelanggan"
+                          >
+                            <MessageCircle className="w-4 h-4" />
+                          </a>
+                        ) : null;
+                      })()}
 
                       <button
                         onClick={() => handlePrintReceipt(order)}
